@@ -6,4 +6,5 @@ edition = "2018"
 
 [dependencies]
 dbg-probe = { path = "../dbg-probe" }
+dbg-types = { path = "../dbg-types" }
 ssmarshal = "1.0.0"
