@@ -66,46 +66,14 @@ impl MemoryInterface {
     /// Read a single transaction's worth of aligned words.
     ///
     /// The transaction must not cross the MEM-AP's auto-increment boundary.
-    fn read_block_u32(&mut self, _addr: u32, _data: &mut [u32]) -> Result<(), AccessPortError> {
-        // TODO:
-        Ok(())
-    }
-
-    /// Write an aligned block of 32-bit words.
-    fn write_memory_block32(&mut self, addr: u32, data: &[u32]) -> Result<(), AccessPortError> {
-        if addr & 0x3 == 0 {
-            let mut size = data.len() as u32;
-            let mut offset = 0;
-            while size > 0 {
-                let current_addr = addr + offset;
-                let mut n = Self::auto_increment_page_size - (current_addr + & (Self::auto_increment_page_size - 1));
-                if size * 4 < n {
-                    n = (size * 4) & 0xfffffffc;
-                }
-                self.write_block_u32(current_addr, &data[offset as usize..offset as usize + n as usize / 4]);
-                size -= n / 4;
-                offset += n;
-            }
-            Ok(())
-        } else {
-            Err(AccessPortError::MemoryNotAligned)
-        }
-    }
-
-    /// Read an aligned block of 32-bit words.
-    fn read_memory_block32(&mut self, mut addr: u32, data: &mut [u32]) -> Result<(), AccessPortError> {
-        if addr & 0x3 == 0 {
-            let mut size = data.len() as u32;
-            let mut offset = 0;
-            while size > 0 {
-                let current_addr = addr + offset;
-                let mut n = Self::auto_increment_page_size - (current_addr & (Self::auto_increment_page_size - 1));
-                if size * 4 < n {
-                    n = (size * 4) & 0xFFFFFFFC;
-                }
-                self.read_block_u32(current_addr, &mut data[offset as usize..offset as usize + n as usize / 4])?;
-                size -= n / 4;
-                offset += n;
+    pub fn read_block_u32(&mut self, debug_port: &mut impl DAPAccess, addr: u32, data: &mut [u32]) -> Result<(), AccessPortError> {
+        if (addr & 0x3) == 0 {
+            let len = data.len() as u32;
+            self.write_reg(debug_port, MEM_AP_CSW, CSW_VALUE | CSW_SIZE32)?;
+            for offset in 0..len {
+                let addr = addr + offset * 4;
+                self.write_reg(debug_port, MEM_AP_TAR, addr)?;
+                data[offset as usize] = self.read_reg(debug_port, MEM_AP_DRW)?;
             }
             Ok(())
         } else {
@@ -175,6 +143,48 @@ impl MemoryInterface {
 //         self.write_reg(MEM_AP_CSW, CSW_VALUE | CSW_SIZE32);
 //         self.write_reg(MEM_AP_TAR, addr);
 //         self.debug_probe.read_ap_multiple((self.access_port << APSEL_SHIFT) | MEM_AP_DRW, data)?;
+//         Ok(())
+//     } else {
+//         Err(AccessPortError::MemoryNotAligned)
+//     }
+// }
+
+// /// Write an aligned block of 32-bit words.
+// fn write_memory_block32(&mut self, addr: u32, data: &[u32]) -> Result<(), AccessPortError> {
+//     if addr & 0x3 == 0 {
+//         let mut size = data.len() as u32;
+//         let mut offset = 0;
+//         while size > 0 {
+//             let current_addr = addr + offset;
+//             let mut n = Self::auto_increment_page_size - (current_addr + & (Self::auto_increment_page_size - 1));
+//             if size * 4 < n {
+//                 n = (size * 4) & 0xfffffffc;
+//             }
+//             self.write_block_u32(current_addr, &data[offset as usize..offset as usize + n as usize / 4]);
+//             size -= n / 4;
+//             offset += n;
+//         }
+//         Ok(())
+//     } else {
+//         Err(AccessPortError::MemoryNotAligned)
+//     }
+// }
+
+// /// Read an aligned block of 32-bit words.
+// fn read_memory_block32(&mut self, mut addr: u32, data: &mut [u32]) -> Result<(), AccessPortError> {
+//     if addr & 0x3 == 0 {
+//         let mut size = data.len() as u32;
+//         let mut offset = 0;
+//         while size > 0 {
+//             let current_addr = addr + offset;
+//             let mut n = Self::auto_increment_page_size - (current_addr & (Self::auto_increment_page_size - 1));
+//             if size * 4 < n {
+//                 n = (size * 4) & 0xFFFFFFFC;
+//             }
+//             self.read_block_u32(current_addr, &mut data[offset as usize..offset as usize + n as usize / 4])?;
+//             size -= n / 4;
+//             offset += n;
+//         }
 //         Ok(())
 //     } else {
 //         Err(AccessPortError::MemoryNotAligned)

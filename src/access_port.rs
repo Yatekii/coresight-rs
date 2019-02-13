@@ -60,6 +60,7 @@ pub mod consts {
 
 pub type AccessPortNumber = u16;
 
+#[derive(Debug)]
 pub enum AccessPortError {
     ProbeError,
     InvalidAccessPortNumber,
