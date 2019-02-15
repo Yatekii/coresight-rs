@@ -15,7 +15,7 @@ pub enum MemoryReadSize {
 pub trait ToMemoryReadSize {
     fn to_memory_read_size() -> u32;
     fn to_result(value: u32) -> Self;
-    fn to_input(value: Self) -> u32;
+    fn to_input(value: &Self) -> u32;
 }
 
 impl ToMemoryReadSize for u32 {
@@ -27,8 +27,8 @@ impl ToMemoryReadSize for u32 {
         value
     }
 
-    fn to_input(value: Self) -> u32 {
-        value
+    fn to_input(value: &Self) -> u32 {
+        *value
     }
 }
 
@@ -41,8 +41,8 @@ impl ToMemoryReadSize for u16 {
         value as u16
     }
 
-    fn to_input(value: Self) -> u32 {
-        value as u32
+    fn to_input(value: &Self) -> u32 {
+        *value as u32
     }
 }
 
@@ -55,8 +55,8 @@ impl ToMemoryReadSize for u8 {
         value as u8
     }
 
-    fn to_input(value: Self) -> u32 {
-        value as u32
+    fn to_input(value: &Self) -> u32 {
+        *value as u32
     }
 }
 
@@ -91,11 +91,43 @@ impl MemoryInterface {
         }
     }
 
+    pub fn read_block<S: ToMemoryReadSize>(&self, debug_port: &mut impl DAPAccess, addr: u32, data: &mut [S]) -> Result<(), AccessPortError> {
+        if (addr & 0x3) == 0 {
+            let unit_size = std::mem::size_of::<S>() as u32;
+            let len = data.len() as u32;
+            self.write_reg(debug_port, MEM_AP_CSW, CSW_VALUE | CSW_SIZE32)?;
+            for offset in 0..len {
+                let addr = addr + offset * unit_size;
+                self.write_reg(debug_port, MEM_AP_TAR, addr)?;
+                data[offset as usize] = S::to_result(self.read_reg(debug_port, MEM_AP_DRW)?);
+            }
+            Ok(())
+        } else {
+            Err(AccessPortError::MemoryNotAligned)
+        }
+    }
+
     pub fn write<S: ToMemoryReadSize>(&self, debug_port: &mut impl DAPAccess, addr: u32, data: S) -> Result<(), AccessPortError> {
         if (addr & 0x3) == 0 {
             self.write_reg(debug_port, MEM_AP_CSW, CSW_VALUE | S::to_memory_read_size())?;
             self.write_reg(debug_port, MEM_AP_TAR, addr)?;
-            self.write_reg(debug_port, MEM_AP_DRW, S::to_input(data))?;
+            self.write_reg(debug_port, MEM_AP_DRW, S::to_input(&data))?;
+            Ok(())
+        } else {
+            Err(AccessPortError::MemoryNotAligned)
+        }
+    }
+
+    pub fn write_block<S: ToMemoryReadSize>(&mut self, debug_port: &mut impl DAPAccess, addr: u32, data: &[S]) -> Result<(), AccessPortError> {
+        if (addr & 0x3) == 0 {
+            let len = data.len() as u32;
+            let unit_size = std::mem::size_of::<S>() as u32;
+            self.write_reg(debug_port, MEM_AP_CSW, CSW_VALUE | S::to_memory_read_size())?;
+            for offset in 0..len {
+                let addr = addr + offset * unit_size;
+                self.write_reg(debug_port, MEM_AP_TAR, addr)?;
+                self.write_reg(debug_port, MEM_AP_DRW, S::to_input(&data[offset as usize]))?;
+            }
             Ok(())
         } else {
             Err(AccessPortError::MemoryNotAligned)
