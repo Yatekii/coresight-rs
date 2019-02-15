@@ -5,3 +5,4 @@ pub mod memory_interface;
 // mod access_ports;
 
 pub mod dap_access;
+pub mod target;

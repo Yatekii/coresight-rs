@@ -1,5 +1,5 @@
 pub trait DAPAccess {
-    type Error;
+    type Error: std::fmt::Debug;
 
     /// Reads the DAP register on the specified port and address
     fn read_register(&mut self, port: u16, addr: u32) -> Result<u32, Self::Error>;
